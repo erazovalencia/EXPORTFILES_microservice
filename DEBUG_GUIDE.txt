@@ -1,0 +1,54 @@
+🔍 GUÍA DE DEBUGGING - ERROR 500 EN PDF
+
+PASOS PARA DIAGNOSTICAR EL PROBLEMA:
+
+1. VERIFICAR QUE EL MICROSERVICIO ESTÉ EJECUTÁNDOSE:
+   - Ejecuta: start.bat
+   - Verifica que aparezca: "Application startup complete"
+   - Ve a: http://localhost:8000/docs
+
+2. PROBAR ENDPOINT DE DEBUG:
+   Ve a: http://localhost:8000/api/v1/debug/pdf
+   
+   Esto te dirá si el servicio PDF básico funciona.
+
+3. PROBAR CON DATOS MÍNIMOS:
+   POST /api/v1/export/pdf
+   {
+     "title": "Test"
+   }
+
+4. REVISAR LOS LOGS:
+   En la terminal donde ejecutaste el microservicio busca:
+   - "🔍 Debug: Procesando solicitud..."
+   - "🔍 Debug: Servicio creado..."
+   - "🔍 Debug: Buffer generado..."
+   - "🔍 Debug: Tamaño del archivo..."
+
+5. SI HAY ERROR EN EL SERVICIO PDF:
+   Ejecuta: python test_pdf_direct.py
+   Esto probará el servicio PDF directamente sin pasar por FastAPI.
+
+6. COMANDOS RÁPIDOS PARA TESTEAR:
+
+   # Debug endpoint
+   curl http://localhost:8000/api/v1/debug/pdf
+
+   # Test simple
+   curl -X POST http://localhost:8000/api/v1/export/pdf \
+        -H "Content-Type: application/json" \
+        -d '{"title": "Test Simple"}'
+
+   # Test endpoint automático
+   curl -X POST http://localhost:8000/api/v1/test/pdf
+
+7. PROBLEMAS COMUNES:
+   - Error de encoding: Revisa que no haya caracteres especiales
+   - Buffer vacío: El servicio PDF no está generando contenido
+   - HTTPException: Alguna validación está fallando
+
+8. SI NADA FUNCIONA:
+   Ejecuta: python debug_test.py
+   Esto te dará información detallada del problema.
+
+RECUERDA: Los logs con "🔍 Debug:" te mostrarán exactamente dónde falla.

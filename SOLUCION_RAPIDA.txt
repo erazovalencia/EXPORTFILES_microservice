@@ -1,0 +1,28 @@
+🚨 SOLUCIÓN RÁPIDA PARA PROBLEMA DE PYDANTIC/RUST
+
+El error que estás viendo es porque Pydantic v2 requiere Rust para compilarse.
+
+EJECUTA ESTOS COMANDOS EN TU TERMINAL (uno por uno):
+
+1. Instalar Pydantic v1 (sin Rust):
+   pip install "pydantic<2.0"
+
+2. Instalar FastAPI compatible:
+   pip install "fastapi>=0.100.0,<0.105.0"
+
+3. Instalar Uvicorn:
+   pip install uvicorn
+
+4. Instalar librerías de archivos:
+   pip install fpdf2 python-docx openpyxl requests
+
+5. Verificar instalación:
+   python check_deps.py
+
+6. Ejecutar el microservicio:
+   python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+ALTERNATIVA AUTOMÁTICA:
+Ejecuta: install-emergency.bat
+
+¡Una vez instalado, ve a http://localhost:8000/docs para ver la documentación!
