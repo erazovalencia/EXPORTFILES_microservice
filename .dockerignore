@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Archivos de prueba y desarrollo
+test_*.py
+demo_*.py
+debug_*.py
+check_*.py
+quick_test.py
+*.bat
+*.sh
+DEBUG_GUIDE.txt
+SOLUCION_RAPIDA.txt
+
+# Archivos temporales
+*.tmp
+*.temp
+*.log
+
+# Docker
+Dockerfile.*
+docker-compose*.yml
+
+# Requirements alternativos
+requirements-*.txt
+requeriments*.txt

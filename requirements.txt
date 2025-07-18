@@ -1,0 +1,17 @@
+# Export Files Microservice - Dependencias
+# Versiones compatibles sin problemas de compilación para Docker
+
+# Framework web y servidor
+fastapi>=0.100.0,<0.105.0
+uvicorn[standard]>=0.20.0,<0.25.0
+
+# Validación de datos (versión 1 para evitar problemas de Rust)
+pydantic>=1.10.0,<2.0.0
+
+# Librerías de exportación
+fpdf2>=2.7.0
+python-docx>=1.0.0
+openpyxl>=3.1.0
+
+# Utilidades
+requests>=2.28.0
