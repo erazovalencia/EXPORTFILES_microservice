@@ -11,7 +11,7 @@ import traceback
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 try:
-    from app.services.pdf_service import PDFExportService
+    from app.services.LORA.pdf.all_reports import PDFExportService
     print("✓ Importación exitosa del PDFExportService")
     
     # Datos de prueba completos

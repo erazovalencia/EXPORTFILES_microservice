@@ -1,12 +1,14 @@
 from fpdf import FPDF
 import io
-from typing import Any, Dict, List
+import requests
+from typing import Any, Dict
 from datetime import datetime
-from ..services.base import BaseExportService
+from ...base import BaseExportService
 
+class ExportSinglePDFReport(BaseExportService):
+    """Genera PDF de un reporte lora con formato valera"""
 
-class PDFExportService(BaseExportService):
-    """Servicio para generar archivos PDF con estilo tipo 'LORA REPORTS'"""
+    API_BASE = "http://localhost:3000/api/lora-report"
 
     def __init__(self):
         self.pdf = None
@@ -25,9 +27,16 @@ class PDFExportService(BaseExportService):
             'action_close': (198, 223, 144),
         }
 
-    def generate_file(self, data: Any, options: Dict = None) -> io.BytesIO:
-        if not self.validate_data(data):
-            raise ValueError("Datos no válidos")
+    async def generate_file(self, data: Any, options: Dict = None) -> io.BytesIO:
+        if not isinstance(data, dict) or "id" not in data:
+            raise ValueError("Se requiere un diccionario con el campo 'id'")
+
+        report_id = data["id"]
+        response = requests.get(f"{self.API_BASE}/{report_id}")
+        if response.status_code != 200:
+            raise ValueError(f"No se pudo obtener el reporte ID {report_id}")
+
+        report_data = response.json()
 
         self.pdf = FPDF(orientation="P", unit="mm", format="A4")
         self.pdf.set_auto_page_break(auto=True, margin=15)
@@ -37,24 +46,19 @@ class PDFExportService(BaseExportService):
         self.pdf.set_font("Courier", "", 11)
         self.pdf.set_text_color(*self.colors['text_dark'])
 
-        self._draw_stamp(data)
-        self._draw_header(data)
-        self._draw_summary(data)
-        self._draw_description(data)
-        self._draw_conversation(data)
-        self._draw_evidences(data)
-        self._draw_actions(data)
-        self._draw_footer(data)
+        self._draw_stamp(report_data)
+        self._draw_header(report_data)
+        self._draw_summary(report_data)
+        self._draw_description(report_data)
+        self._draw_conversation(report_data)
+        self._draw_evidences(report_data)
+        self._draw_actions(report_data)
+        self._draw_footer(report_data)
 
         buffer = io.BytesIO()
         pdf_output = self.pdf.output(dest='S')
-        if isinstance(pdf_output, (bytes, bytearray)):
-            buffer.write(pdf_output)
-        else:
-            buffer.write(pdf_output.encode('latin-1'))
-
-        buffer.write(pdf_output)
-        buffer.seek(0)  
+        buffer.write(pdf_output if isinstance(pdf_output, (bytes, bytearray)) else pdf_output.encode('latin-1'))
+        buffer.seek(0)
         return buffer
 
     # ---------------------------
@@ -223,3 +227,4 @@ class PDFExportService(BaseExportService):
 
     def get_file_extension(self) -> str:
         return ".pdf"
+

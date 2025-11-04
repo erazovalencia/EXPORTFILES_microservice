@@ -9,7 +9,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
-    from app.services.pdf_service import PDFExportService
+    from app.services.LORA.pdf.all_reports import PDFExportService
     
     def test_pdf_service():
         """Test directo del servicio PDF"""

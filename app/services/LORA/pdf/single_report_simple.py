@@ -1,0 +1,104 @@
+from fpdf import FPDF
+import io
+from typing import Any, Dict, List
+from datetime import datetime
+from ..services.base import BaseExportService
+
+
+class ExportSinglePDFReportSimple(BaseExportService):
+    """Genera PDF con diseño institucional serio y limpio"""
+
+    def __init__(self):
+        self.pdf = FPDF(orientation="P", unit="mm", format="A4")
+
+    def generate_file(self, data: Any, options: Dict = None) -> io.BytesIO:
+        if not self.validate_data(data):
+            raise ValueError("Datos no válidos")
+
+        self.pdf.add_page()
+        self.pdf.set_auto_page_break(auto=True, margin=15)
+        self.pdf.set_font("Courier", "", 11)
+        self.pdf.set_text_color(0, 0, 0)
+
+        self._render_header(data)
+        self._render_section("Resumen", self._extract_summary(data))
+        self._render_section("Descripción", data.get("detailedDescription", "N/A"))
+        self._render_section("Causa", data.get("findingCause", "N/A"))
+        self._render_section("Conversación", data.get("conversation", "N/A"))
+        self._render_section("Evidencias", "\n".join(data.get("evidence", ["Sin evidencias adjuntas"])))
+        self._render_section("Acciones", self._format_actions(data.get("actions", [])))
+        self._render_footer(data)
+
+        buffer = io.BytesIO()
+        pdf_output = self.pdf.output(dest='S')
+
+        if isinstance(pdf_output, (bytes, bytearray)):
+            buffer.write(pdf_output)
+        else:
+            buffer.write(pdf_output.encode('latin-1'))
+
+        buffer.seek(0)
+        return buffer
+
+    def _render_header(self, data: Dict):
+        self.pdf.set_font("Courier", "B", 14)
+        self.pdf.cell(0, 8, "REPORTE DE HALLAZGO", ln=True, align="C")
+        self.pdf.set_font("Courier", "", 10)
+        self.pdf.cell(0, 6, f"Código: {data.get('loraReportCode', 'N/A')}", ln=True)
+        self.pdf.cell(0, 6, f"Título: {data.get('reportTitle', 'N/A')}", ln=True)
+        self.pdf.cell(0, 6, f"Estado: {data.get('reportStatus', 'N/A').upper()}", ln=True)
+        self.pdf.cell(0, 6, f"Fecha de creación: {data.get('createdAt', 'N/A')}", ln=True)
+        self._draw_separator()
+
+    def _render_section(self, title: str, content: str):
+        self.pdf.set_font("Courier", "B", 12)
+        self.pdf.cell(0, 7, title.upper(), ln=True)
+        self.pdf.set_font("Courier", "", 10)
+        self.pdf.multi_cell(0, 6, str(content).strip() or "N/A")
+        self._draw_separator()
+
+    def _render_footer(self, data: Dict):
+        self.pdf.set_y(-30)
+        self._draw_separator()
+        self.pdf.set_font("Courier", "I", 8)
+        self.pdf.cell(0, 5, f"ID de reporte: {data.get('id', 'N/A')}", ln=True, align="R")
+        self.pdf.cell(0, 5, f"Exportado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align="R")
+        self.pdf.cell(0, 5, "ExportFiles Microservice", ln=True, align="C")
+
+    def _draw_separator(self):
+        self.pdf.ln(2)
+        self.pdf.cell(0, 0, "-" * 120, ln=True)
+        self.pdf.ln(3)
+
+    def _extract_summary(self, data: Dict) -> str:
+        fields = [
+            ("Proyecto", "project"),
+            ("Unidad", "unity"),
+            ("Rig", "rig"),
+            ("Base", "base"),
+            ("Campo", "field"),
+            ("Clasificación", "hazardClassification"),
+            ("Tipo de Reporte", "reportType"),
+            ("Tipo", "hazardType"),
+            ("Creado por", "createdBy"),
+            ("Actualizado", "updatedAt"),
+        ]
+        return "\n".join([f"{label}: {data.get(key, 'N/A')}" for label, key in fields])
+
+    def _format_actions(self, actions: List[Dict]) -> str:
+        if not actions:
+            return "Sin acciones registradas."
+        result = []
+        for i, act in enumerate(actions, 1):
+            desc = act.get("description", "N/A")
+            resp = act.get("responsible", "N/A")
+            due = act.get("dueDate", "N/A")
+            status = act.get("status", "N/A").upper()
+            result.append(f"{i}. {desc}\n   Responsable: {resp}\n   Fecha límite: {due}\n   Estado: {status}\n")
+        return "\n".join(result)
+
+    def get_content_type(self) -> str:
+        return "application/pdf"
+
+    def get_file_extension(self) -> str:
+        return ".pdf"

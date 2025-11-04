@@ -9,7 +9,7 @@ print("=== PRUEBA PDF PROFESIONAL ===")
 
 try:
     # Importar el servicio
-    from app.services.pdf_service import PDFExportService
+    from app.services.LORA.pdf.all_reports import PDFExportService
     print("✓ Servicio PDF importado correctamente")
     
     # Crear datos de prueba

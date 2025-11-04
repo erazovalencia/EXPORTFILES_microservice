@@ -18,7 +18,7 @@ def main():
     print("="*60)
     
     try:
-        from app.services.pdf_service import PDFExportService
+        from app.services.LORA.pdf.all_reports import PDFExportService
         print("✓ Servicio PDF cargado correctamente")
         
         # Datos de demostración completos

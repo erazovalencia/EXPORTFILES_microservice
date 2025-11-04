@@ -14,7 +14,7 @@ def test_pdf_locally():
     
     try:
         print("📦 Importando el servicio PDF...")
-        from app.services.pdf_service import PDFExportService
+        from app.services.LORA.pdf.all_reports import PDFExportService
         print("✅ Servicio PDF importado correctamente")
         
         # Datos de prueba
