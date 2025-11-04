@@ -2,7 +2,8 @@ from fpdf import FPDF
 import io
 from typing import Any, Dict, List
 from datetime import datetime
-from ..services.base import BaseExportService
+from pathlib import Path
+from ...base import BaseExportService
 
 
 class ExportSinglePDFReportSimple(BaseExportService):
@@ -10,6 +11,18 @@ class ExportSinglePDFReportSimple(BaseExportService):
 
     def __init__(self):
         self.pdf = FPDF(orientation="P", unit="mm", format="A4")
+        # Registrar fuentes Unicode (DejaVu) para acentos/caracteres especiales
+        BASE_DIR = Path(__file__).resolve().parents[3]
+        FONT_DIR = BASE_DIR / "fonts"
+        normal = FONT_DIR / "DejaVuSerif.ttf"
+        bold = FONT_DIR / "DejaVuSerif-Bold.ttf"
+        self.pdf.add_font("DejaVu", "", str(normal), uni=True)
+        if bold.exists():
+            self.pdf.add_font("DejaVu", "B", str(bold), uni=True)
+        else:
+            self.pdf.add_font("DejaVu", "B", str(normal), uni=True)
+        # Register italic (fallback to normal)
+        self.pdf.add_font("DejaVu", "I", str(normal), uni=True)
 
     def generate_file(self, data: Any, options: Dict = None) -> io.BytesIO:
         if not self.validate_data(data):
@@ -17,7 +30,7 @@ class ExportSinglePDFReportSimple(BaseExportService):
 
         self.pdf.add_page()
         self.pdf.set_auto_page_break(auto=True, margin=15)
-        self.pdf.set_font("Courier", "", 11)
+        self.pdf.set_font("DejaVu", "", 11)
         self.pdf.set_text_color(0, 0, 0)
 
         self._render_header(data)
@@ -41,29 +54,30 @@ class ExportSinglePDFReportSimple(BaseExportService):
         return buffer
 
     def _render_header(self, data: Dict):
-        self.pdf.set_font("Courier", "B", 14)
-        self.pdf.cell(0, 8, "REPORTE DE HALLAZGO", ln=True, align="C")
-        self.pdf.set_font("Courier", "", 10)
+        self.pdf.set_font("DejaVu", "B", 14)
+        self.pdf.cell(0, 8, f"Reporte LORA - {data.get('reportTitle', 'N/A')}", ln=True, align="C")
+        self.pdf.set_font("DejaVu", "B", 10)
+        self.pdf.cell(0, 8, f"ID de reporte: {data.get('id', 'N/A')}", ln=True, align="L")
+        self.pdf.set_font("DejaVu", "", 10)       
         self.pdf.cell(0, 6, f"Código: {data.get('loraReportCode', 'N/A')}", ln=True)
-        self.pdf.cell(0, 6, f"Título: {data.get('reportTitle', 'N/A')}", ln=True)
         self.pdf.cell(0, 6, f"Estado: {data.get('reportStatus', 'N/A').upper()}", ln=True)
         self.pdf.cell(0, 6, f"Fecha de creación: {data.get('createdAt', 'N/A')}", ln=True)
         self._draw_separator()
 
     def _render_section(self, title: str, content: str):
-        self.pdf.set_font("Courier", "B", 12)
+        self.pdf.set_font("DejaVu", "B", 12)
         self.pdf.cell(0, 7, title.upper(), ln=True)
-        self.pdf.set_font("Courier", "", 10)
+        self.pdf.set_font("DejaVu", "", 10)
         self.pdf.multi_cell(0, 6, str(content).strip() or "N/A")
         self._draw_separator()
 
     def _render_footer(self, data: Dict):
         self.pdf.set_y(-30)
         self._draw_separator()
-        self.pdf.set_font("Courier", "I", 8)
+        self.pdf.set_font("DejaVu", "I", 8)
         self.pdf.cell(0, 5, f"ID de reporte: {data.get('id', 'N/A')}", ln=True, align="R")
         self.pdf.cell(0, 5, f"Exportado: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", ln=True, align="R")
-        self.pdf.cell(0, 5, "ExportFiles Microservice", ln=True, align="C")
+        self.pdf.cell(0, 5, "Documento generado automaticamente por VALERA ECOSYSTEM", ln=True, align="C")
 
     def _draw_separator(self):
         self.pdf.ln(2)
@@ -102,3 +116,7 @@ class ExportSinglePDFReportSimple(BaseExportService):
 
     def get_file_extension(self) -> str:
         return ".pdf"
+
+
+
+

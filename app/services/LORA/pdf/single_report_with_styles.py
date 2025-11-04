@@ -1,14 +1,12 @@
 from fpdf import FPDF
 import io
-import requests
-from typing import Any, Dict
+from typing import Any, Dict, List
 from datetime import datetime
 from ...base import BaseExportService
 
-class ExportSinglePDFReport(BaseExportService):
-    """Genera PDF de un reporte lora con formato valera"""
 
-    API_BASE = "http://localhost:3000/api/lora-report"
+class ExportSinglePDFReportWithStyle(BaseExportService):
+    """Genera PDF de un reporte LORA con estilo visual."""
 
     def __init__(self):
         self.pdf = None
@@ -28,16 +26,10 @@ class ExportSinglePDFReport(BaseExportService):
         }
 
     async def generate_file(self, data: Any, options: Dict = None) -> io.BytesIO:
-        if not isinstance(data, dict) or "id" not in data:
-            raise ValueError("Se requiere un diccionario con el campo 'id'")
+        if not isinstance(data, dict):
+            raise ValueError("Se requiere un diccionario con los datos del reporte")
 
-        report_id = data["id"]
-        response = requests.get(f"{self.API_BASE}/{report_id}")
-        if response.status_code != 200:
-            raise ValueError(f"No se pudo obtener el reporte ID {report_id}")
-
-        report_data = response.json()
-
+        report_data = data
         self.pdf = FPDF(orientation="P", unit="mm", format="A4")
         self.pdf.set_auto_page_break(auto=True, margin=15)
         self.pdf.add_page()
@@ -61,22 +53,16 @@ class ExportSinglePDFReport(BaseExportService):
         buffer.seek(0)
         return buffer
 
-    # ---------------------------
-    # COMPONENTES VISUALES
-    # ---------------------------
-
+    # Visual components
     def _draw_stamp(self, data: Dict):
-        """Dibuja el sello OPEN o CLOSE"""
         status = str(data.get("reportStatus", "open")).lower()
         stamp_text = "ABIERTO" if status == "open" else "CERRADO"
-
         if status == "open":
             bg = self.colors['open_stamp_bg']
             border = self.colors['open_stamp_border']
         else:
             bg = self.colors['close_stamp_bg']
             border = self.colors['close_stamp_border']
-
         self.pdf.set_xy(150, 15)
         self.pdf.set_fill_color(*bg)
         self.pdf.set_draw_color(*border)
@@ -85,15 +71,13 @@ class ExportSinglePDFReport(BaseExportService):
         self.pdf.cell(45, 10, stamp_text, border=1, align='C', fill=True)
 
     def _draw_header(self, data: Dict):
-        """Encabezado principal: código, título y fecha"""
-        code = data.get("loraReportCode", "Sin código")
-        title = data.get("reportTitle", "Sin título")
-        created = data.get("createdAt", datetime.now().strftime("%d/%m/%Y"))
-
+        code = data.get("loraReportCode", "Sin codigo")
+        title = data.get("reportTitle", "Sin titulo")
+        created = data.get("createdAt", datetime.now().strftime("%Y-%m-%d"))
         self.pdf.ln(20)
         self.pdf.set_font("Courier", "B", 11)
         self.pdf.set_text_color(*self.colors['text_brown'])
-        self.pdf.cell(0, 8, f"CÓDIGO: {code}", ln=True)
+        self.pdf.cell(0, 8, f"CODIGO: {code}", ln=True)
         self.pdf.set_font("Courier", "B", 18)
         self.pdf.set_text_color(*self.colors['text_dark'])
         self.pdf.cell(0, 10, title.upper(), ln=True)
@@ -103,14 +87,13 @@ class ExportSinglePDFReport(BaseExportService):
         self._draw_line()
 
     def _draw_summary(self, data: Dict):
-        """Bloque de resumen con proyecto, unidad, etc."""
         summary_fields = [
             ("Proyecto", data.get("project", "N/A")),
             ("Unidad", data.get("unity", "N/A")),
             ("Rig", data.get("rig", "N/A")),
             ("Base", data.get("base", "N/A")),
             ("Campo", data.get("field", "N/A")),
-            ("Clasificación", data.get("hazardClassification", "N/A")),
+            ("Clasificacion", data.get("hazardClassification", "N/A")),
             ("Tipo de Reporte", data.get("reportType", "N/A")),
             ("Tipo", data.get("hazardType", "N/A")),
             ("Creado por", data.get("createdBy", "N/A")),
@@ -120,13 +103,13 @@ class ExportSinglePDFReport(BaseExportService):
 
     def _draw_description(self, data: Dict):
         if data.get("detailedDescription"):
-            self._draw_block("Descripción", self._render_paragraph, data["detailedDescription"])
+            self._draw_block("Descripcion", self._render_paragraph, data["detailedDescription"])
         if data.get("findingCause"):
             self._draw_block("Causa", self._render_paragraph, data["findingCause"])
 
     def _draw_conversation(self, data: Dict):
         if data.get("conversation"):
-            self._draw_block("Conversación", self._render_paragraph, data["conversation"])
+            self._draw_block("Conversacion", self._render_paragraph, data["conversation"])
 
     def _draw_evidences(self, data: Dict):
         evidences = data.get("evidence", [])
@@ -147,14 +130,10 @@ class ExportSinglePDFReport(BaseExportService):
         self.pdf.set_font("Courier", "I", 8)
         self.pdf.set_text_color(*self.colors['text_brown'])
         self.pdf.cell(0, 6, f"ID: {data.get('id', 'N/A')}", ln=True, align="R")
-        self.pdf.cell(0, 5, "Documento generado automáticamente por VALERA ECOSYSTEM", ln=True, align="C")
+        self.pdf.cell(0, 5, "Documento generado automaticamente por VALERA ECOSYSTEM", ln=True, align="C")
 
-    # ---------------------------
-    # BLOQUES / SECCIONES
-    # ---------------------------
-
+    # Blocks / sections helpers
     def _draw_block(self, title: str, render_fn, content):
-        """Renderiza un bloque decorado"""
         y = self.pdf.get_y() + 4
         self.pdf.set_fill_color(*self.colors['block_bg'])
         self.pdf.set_draw_color(*self.colors['border'])
@@ -167,10 +146,6 @@ class ExportSinglePDFReport(BaseExportService):
         self._draw_line()
         render_fn(content)
         self.pdf.ln(3)
-
-    # ---------------------------
-    # RENDERIZADORES DE CONTENIDO
-    # ---------------------------
 
     def _render_summary_grid(self, items: List):
         self.pdf.set_font("Courier", "", 10)
@@ -204,18 +179,15 @@ class ExportSinglePDFReport(BaseExportService):
             self.pdf.set_fill_color(*bg)
             self.pdf.set_x(15)
             self.pdf.set_font("Courier", "B", 10)
-            self.pdf.cell(0, 8, f"Acción: {act.get('description', 'N/A')}", ln=True, fill=True)
+            self.pdf.cell(0, 8, f"Accion: {act.get('description', 'N/A')}", ln=True, fill=True)
             self.pdf.set_font("Courier", "", 9)
             resp = act.get("responsible", "No asignado")
             due = act.get("dueDate", "N/A")
             self.pdf.cell(0, 6, f"Responsable: {resp}", ln=True)
-            self.pdf.cell(0, 6, f"Fecha límite: {due}", ln=True)
+            self.pdf.cell(0, 6, f"Fecha limite: {due}", ln=True)
             self.pdf.ln(3)
 
-    # ---------------------------
-    # UTILITARIOS
-    # ---------------------------
-
+    # Utils
     def _draw_line(self):
         self.pdf.set_draw_color(*self.colors['border'])
         y = self.pdf.get_y()

@@ -7,7 +7,7 @@ from datetime import datetime
 from ...base import BaseExportService
 
 
-class DOCS(BaseExportService):
+class DOCXExportService(BaseExportService):
     """Servicio para generar reportes DOCX con formato institucional y sobrio"""
 
     def __init__(self):

@@ -1,20 +1,20 @@
 import io
 from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import StreamingResponse
-from typing import Dict, Any
 from datetime import datetime
-from ..utils.file_utils import generate_filename, validate_filename, get_file_size_mb
-
-from ..models.ExportModel import ExportRequest, ExportResponse, FileFormat
+from ..models.ExportModel import FileFormat
 
 from ..services.LORA.pdf.all_reports import ExportAllReports
+from ..services.LORA.pdf.single_report_simple import ExportSinglePDFReportSimple
+from ..services.LORA.pdf.single_report_with_styles import ExportSinglePDFReportWithStyle
 from ..services.LORA.docs.single_report import DOCXExportService
 from ..services.LORA.xlsx.single_report import XLSXExportService
 from ..services.LORA.xlsx.all_reports import XLSXListExportService
+from ..services.valera_client import get_report_by_id, get_reports
 
 router = APIRouter()
 
-# Mapeo de formatos a servicios
+# Mapeo de formatos a servicios (metadatos)
 SERVICE_MAP = {
     FileFormat.PDF: ExportAllReports,
     FileFormat.DOCX: DOCXExportService,
@@ -23,124 +23,128 @@ SERVICE_MAP = {
 
 @router.get("/health")
 async def health_check():
-    """Endpoint para verificar el estado del servicio"""
     return {
         "status": "Healthy",
         "timestamp": datetime.now().isoformat(),
-        "supported_formats": [format.value for format in FileFormat]
+        "supported_formats": [fmt.value for fmt in FileFormat],
     }
 
 @router.get("/formats")
 async def get_supported_formats():
-    """Endpoint para obtener los formatos soportados"""
     return {
         "supported_formats": [
             {
-                "format": format.value,
-                "content_type": SERVICE_MAP[format]().get_content_type(),
-                "extension": SERVICE_MAP[format]().get_file_extension()
+                "format": fmt.value,
+                "content_type": SERVICE_MAP[fmt]().get_content_type(),
+                "extension": SERVICE_MAP[fmt]().get_file_extension(),
             }
-            for format in FileFormat
+            for fmt in FileFormat
         ]
     }
 
-@router.post("/export/lora/pdf_single_report")
-async def export_single_report_pdf(request_data: Dict[str, Any]):
-    """
-    Exporta un reporte LORA individual en formato PDF decorado.
-    Espera un JSON como: { "id": 67 }
-    """
-    try:
-        print(f"Solicitud recibida: {request_data}")
-        
-        service = ExportAllReports()
-        file_buffer = await service.generate_file(data=request_data)
-
-        filename = f"Reporte_LORA_{request_data['id']}.pdf"
-        headers = {
-            "Content-Disposition": f"attachment; filename={filename}"
-        }
-
-        return StreamingResponse(file_buffer, media_type="application/pdf", headers=headers)
-
-    except Exception as e:
-        import traceback
-        print(f"Error en export_decorated_pdf: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error exportando PDF decorado: {str(e)}")
-    
-@router.post("/export/lora/docs_single_report")
-async def export__single_report_docx(request_data: Dict[str, Any]):
-    """Endpoint específico para exportar un unico rpeorte dado un id en formato DOCX"""
-    # Manejar tanto el formato completo como el formato simplificado
-    if 'data' in request_data and 'file_format' not in request_data:
-        # Formato simplificado: {data: {...}, filename: "..."}
-        data = request_data.get('data', request_data)
-        filename = request_data.get('filename', None)
-    else:
-        # Formato completo o datos directos
-        data = request_data
-        filename = request_data.get('filename', None)
-    
-    request = ExportRequest(
-        file_format=FileFormat.DOCX,
-        data=data,
-        filename=filename
-    )
-    return await export__single_report_docx(request)
-
-@router.post("/export/lora/xlsx_single_report")
-async def export_xlsx(request_data: Dict[str, Any]):
-    """Endpoint específico para exportar XLSX"""
-    # Manejar tanto el formato completo como el formato simplificado
-    if 'data' in request_data and 'file_format' not in request_data:
-        # Formato simplificado: {data: {...}, filename: "..."}
-        data = request_data.get('data', request_data)
-        filename = request_data.get('filename', None)
-    else:
-        # Formato completo o datos directos
-        data = request_data
-        filename = request_data.get('filename', None)
-    
-    request = ExportRequest(
-        file_format=FileFormat.XLSX,
-        data=data,
-        filename=filename
-    )
-    return await export_file(request)
-
-@router.get("/export/lora/pdf_all_reports", summary="Exporta todos los reportes como un único PDF")
+@router.get("/lora/pdf_all_reports", summary="Exporta todos los reportes en un PDF")
 async def export_pdf_all_reports():
     try:
         service = ExportAllReports()
         file_buffer = await service.generate_file()
-
         return Response(
             content=file_buffer.read(),
             media_type=service.get_content_type(),
-            headers={
-                "Content-Disposition": f'attachment; filename="todos_los_reportes.pdf"'
-            }
+            headers={"Content-Disposition": 'attachment; filename="todos_los_reportes.pdf"'},
         )
     except Exception as e:
-        import traceback
-        print(f"Error en export_all_reports: {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail="Error al exportar reportes en PDF")
+        raise HTTPException(status_code=500, detail=f"Error al exportar reportes en PDF: {str(e)}")
 
-@router.post("/export/xlsx_list")
-async def export_xlsx_list(request: ExportRequest):
-    if request.file_format != FileFormat.XLSX:
-        raise HTTPException(400, "Formato no permitido para esta ruta")
-
-    if isinstance(request.data, list):
-        service = XLSXListExportService()
-    else:
-        service = XLSXExportService()
-
-    file_buffer = service.generate_file(request.data, request.options)
-    filename = (request.filename or "reporte") + service.get_file_extension()
+@router.get("/lora/xlsx_all_reports", summary="Exporta todos los reportes en XLSX (listado)")
+def export_xlsx_all_reports():
+    data = get_reports()
+    service = XLSXListExportService()
+    file_buffer = service.generate_file(data, None)
+    filename = f"todos_los_reportes{service.get_file_extension()}"
     return StreamingResponse(
         io.BytesIO(file_buffer.read()),
         media_type=service.get_content_type(),
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
+@router.get("/lora/docx/{id}")
+def export_single_report_docx(id: int):
+    try:
+        data = get_report_by_id(id)
+        service = DOCXExportService()
+        file_buffer = service.generate_file(data)
+        filename = f"lora_report_{id}{service.get_file_extension()}"
+        return StreamingResponse(
+            io.BytesIO(file_buffer.read()),
+            media_type=service.get_content_type(),
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exportando DOCX: {str(e)}")
+
+@router.get("/lora/xlsx/{id}")
+def export_single_report_xlsx(id: int):
+    try:
+        data = get_report_by_id(id)
+        service = XLSXExportService()
+        file_buffer = service.generate_file(data)
+        filename = f"lora_report_{id}{service.get_file_extension()}"
+        return StreamingResponse(
+            io.BytesIO(file_buffer.read()),
+            media_type=service.get_content_type(),
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exportando XLSX: {str(e)}")
+
+def _normalize_report_for_single_pdf(data: dict) -> dict:
+    # Adaptar evidencias a lista esperada por los servicios
+    if 'evidence' not in data:
+        evid = data.get('reportEvidence')
+        if evid:
+            data['evidence'] = [evid]
+        else:
+            data['evidence'] = []
+    # Adaptar responsable dentro de acciones
+    actions = data.get('actions') or []
+    for act in actions:
+        if 'responsible' not in act:
+            assigned = act.get('assignedTo') or {}
+            user_info = (assigned or {}).get('userInformation') or {}
+            name = (user_info.get('name') or '').strip()
+            last = (user_info.get('lastName') or '').strip()
+            full = f"{name} {last}".strip()
+            act['responsible'] = full or assigned.get('documentId') or ''
+    return data
+
+@router.get("/lora/pdf_simple/{id}")
+def export_single_report_pdf_simple(id: int):
+    try:
+        data = get_report_by_id(id)
+        data = _normalize_report_for_single_pdf(data)
+        service = ExportSinglePDFReportSimple()
+        file_buffer = service.generate_file(data)
+        filename = f"lora_report_{id}.pdf"
+        return StreamingResponse(
+            io.BytesIO(file_buffer.read()),
+            media_type=service.get_content_type(),
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exportando PDF simple: {str(e)}")
+
+@router.get("/lora/pdf_styled/{id}")
+async def export_single_report_pdf_styled(id: int):
+    try:
+        data = get_report_by_id(id)
+        data = _normalize_report_for_single_pdf(data)
+        service = ExportSinglePDFReportWithStyle()
+        file_buffer = await service.generate_file(data)
+        filename = f"lora_report_{id}.pdf"
+        return StreamingResponse(
+            io.BytesIO(file_buffer.read()),
+            media_type=service.get_content_type(),
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error exportando PDF con estilo: {str(e)}")

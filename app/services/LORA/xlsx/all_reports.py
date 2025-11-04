@@ -35,10 +35,10 @@ class XLSXListExportService(BaseExportService):
 
         # Encabezados conforme al modelo completo
         headers = [
-            "id", "userId", "reportTitle", "description", "typeReport", "relation", "class", "ubication",
+            "id", "userId", "reportTitle",
             "conversation", "base", "createdAt", "updatedAt", "unity", "rig", "project", "field",
             "reportType", "hazardClassification", "hazardType", "detailedDescription", "findingCause",
-            "reportEvidence", "reportStatus", "closureActions", "user.externalName", "user.externalOrganization",
+            "reportEvidence", "reportStatus", "closureActions", "externalName", "externalOrganization",
             "loraReportCode"
         ]
 
