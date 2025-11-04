@@ -19,7 +19,6 @@ SERVICE_MAP = {
     FileFormat.XLSX: XLSXExportService,
 }
 
-
 @router.get("/health")
 async def health_check():
     """Endpoint para verificar el estado del servicio"""
@@ -30,7 +29,66 @@ async def health_check():
     }
 
 
-@router.post("/export", response_model=ExportResponse)
+@router.get("/formats")
+async def get_supported_formats():
+    """Endpoint para obtener los formatos soportados"""
+    return {
+        "supported_formats": [
+            {
+                "format": format.value,
+                "content_type": SERVICE_MAP[format]().get_content_type(),
+                "extension": SERVICE_MAP[format]().get_file_extension()
+            }
+            for format in FileFormat
+        ]
+    }
+
+
+@router.get("/examples")
+async def get_examples():
+    """Endpoint para obtener ejemplos de datos de prueba"""
+    return {
+        "simple_table": {
+            "title": "Ejemplo de Tabla Simple",
+            "headers": ["Producto", "Cantidad", "Precio"],
+            "rows": [
+                ["Laptop", 10, 1200.00],
+                ["Mouse", 50, 25.00],
+                ["Teclado", 30, 45.00]
+            ]
+        },
+        "document_with_content": {
+            "title": "Documento de Ejemplo",
+            "content": [
+                "Este es el primer párrafo del documento.",
+                "Aquí va información adicional en el segundo párrafo."
+            ],
+            "tables": [
+                {
+                    "title": "Datos de Muestra",
+                    "headers": ["Columna 1", "Columna 2"],
+                    "rows": [["Dato 1", "Dato 2"], ["Dato 3", "Dato 4"]]
+                }
+            ]
+        },
+        "multiple_tables": {
+            "tables": [
+                {
+                    "title": "Ventas Q1",
+                    "headers": ["Mes", "Ventas"],
+                    "rows": [["Enero", 1000], ["Febrero", 1200], ["Marzo", 1100]]
+                },
+                {
+                    "title": "Ventas Q2",
+                    "headers": ["Mes", "Ventas"],
+                    "rows": [["Abril", 1300], ["Mayo", 1400], ["Junio", 1250]]
+                }
+            ]
+        }
+    }
+
+
+@router.post("/export")
 async def export_file(request: ExportRequest):
     """
     Endpoint principal para exportar archivos
@@ -42,8 +100,8 @@ async def export_file(request: ExportRequest):
         StreamingResponse: Archivo generado para descarga
     """
     try:
-        print(f"🔍 Debug: Procesando solicitud para formato {request.file_format}")
-        print(f"🔍 Debug: Datos recibidos: {type(request.data)}")
+        print(f" Debug: Procesando solicitud para formato {request.file_format}")
+        print(f" Debug: Datos recibidos: {type(request.data)}")
         
         # Validar formato
         if request.file_format not in SERVICE_MAP:
@@ -198,65 +256,6 @@ async def export_xlsx(request_data: Dict[str, Any]):
         filename=filename
     )
     return await export_file(request)
-
-
-@router.get("/formats")
-async def get_supported_formats():
-    """Endpoint para obtener los formatos soportados"""
-    return {
-        "supported_formats": [
-            {
-                "format": format.value,
-                "content_type": SERVICE_MAP[format]().get_content_type(),
-                "extension": SERVICE_MAP[format]().get_file_extension()
-            }
-            for format in FileFormat
-        ]
-    }
-
-
-@router.get("/examples")
-async def get_examples():
-    """Endpoint para obtener ejemplos de datos de prueba"""
-    return {
-        "simple_table": {
-            "title": "Ejemplo de Tabla Simple",
-            "headers": ["Producto", "Cantidad", "Precio"],
-            "rows": [
-                ["Laptop", 10, 1200.00],
-                ["Mouse", 50, 25.00],
-                ["Teclado", 30, 45.00]
-            ]
-        },
-        "document_with_content": {
-            "title": "Documento de Ejemplo",
-            "content": [
-                "Este es el primer párrafo del documento.",
-                "Aquí va información adicional en el segundo párrafo."
-            ],
-            "tables": [
-                {
-                    "title": "Datos de Muestra",
-                    "headers": ["Columna 1", "Columna 2"],
-                    "rows": [["Dato 1", "Dato 2"], ["Dato 3", "Dato 4"]]
-                }
-            ]
-        },
-        "multiple_tables": {
-            "tables": [
-                {
-                    "title": "Ventas Q1",
-                    "headers": ["Mes", "Ventas"],
-                    "rows": [["Enero", 1000], ["Febrero", 1200], ["Marzo", 1100]]
-                },
-                {
-                    "title": "Ventas Q2",
-                    "headers": ["Mes", "Ventas"],
-                    "rows": [["Abril", 1300], ["Mayo", 1400], ["Junio", 1250]]
-                }
-            ]
-        }
-    }
 
 
 @router.post("/test/{format}")

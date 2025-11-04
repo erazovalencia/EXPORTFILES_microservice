@@ -23,11 +23,11 @@ RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /
 USER appuser
 
 # Exponer puerto
-EXPOSE 7000
+EXPOSE 8000
 
 # Variables de entorno
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 # Comando para ejecutar la aplicación
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
