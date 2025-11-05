@@ -18,6 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar código de la aplicación
 COPY app/ ./app/
 
+# Copiar archivo de entorno (.env)
+COPY .env .env
+
 # Crear usuario no root para seguridad
 RUN adduser --disabled-password --gecos '' appuser && chown -R appuser:appuser /app
 USER appuser

@@ -1,16 +1,22 @@
 import io
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, HTTPException, Response, Request
 from fastapi.responses import StreamingResponse
 from datetime import datetime
 from ..models.ExportModel import FileFormat
 
 from ..services.LORA.pdf.all_reports import ExportAllReports
+from ..services.LORA.pdf.all_reports_by_userId import ExportAllReportsByUserId
 from ..services.LORA.pdf.single_report_simple import ExportSinglePDFReportSimple
 from ..services.LORA.pdf.single_report_with_styles import ExportSinglePDFReportWithStyle
 from ..services.LORA.docs.single_report import DOCXExportService
 from ..services.LORA.xlsx.single_report import XLSXExportService
 from ..services.LORA.xlsx.all_reports import XLSXListExportService
-from ..services.valera_client import get_report_by_id, get_reports
+from ..services.valera_client import (
+    get_report_by_id,
+    get_reports,
+    get_report_by_userId,
+    get_reports_by_filters,
+)
 
 router = APIRouter()
 
@@ -55,6 +61,19 @@ async def export_pdf_all_reports():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al exportar reportes en PDF: {str(e)}")
 
+@router.get("/lora/pdf_all_reports_by_user/{userId}", summary="Exporta reportes por usuario en un PDF")
+async def export_pdf_all_reports_by_user(userId: int):
+    try:
+        service = ExportAllReportsByUserId(userId)
+        file_buffer = await service.generate_file()
+        return Response(
+            content=file_buffer.read(),
+            media_type=service.get_content_type(),
+            headers={"Content-Disposition": f'attachment; filename="reportes_usuario_{userId}.pdf"'},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al exportar reportes por usuario en PDF: {str(e)}")
+
 @router.get("/lora/xlsx_all_reports", summary="Exporta todos los reportes en XLSX (listado)")
 def export_xlsx_all_reports():
     data = get_reports()
@@ -66,6 +85,42 @@ def export_xlsx_all_reports():
         media_type=service.get_content_type(),
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+@router.get("/lora/xlsx_all_reports_by_user/{userId}", summary="Exporta reportes por usuario en XLSX (listado)")
+def export_xlsx_all_reports_by_user(userId: int):
+    resp = get_report_by_userId(userId)
+    data = (((resp or {}).get("data") or {}).get("data") or [])
+    service = XLSXListExportService()
+    file_buffer = service.generate_file(data, None)
+    filename = f"reportes_usuario_{userId}{service.get_file_extension()}"
+    return StreamingResponse(
+        io.BytesIO(file_buffer.read()),
+        media_type=service.get_content_type(),
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+@router.get("/lora/xlsx_all_reports_filter", summary="Exporta reportes filtrados en XLSX (listado)")
+def export_xlsx_all_reports_filter(request: Request):
+    try:
+        # Capturar todos los filtros recibidos (soporta claves repetidas)
+        params_list = list(request.query_params.multi_items())
+
+        # Llamar al cliente VALERA para obtener los datos filtrados
+        resp = get_reports_by_filters(params_list)
+        data = (((resp or {}).get("data") or {}).get("data") or [])
+
+        # Generar XLSX usando el servicio existente de listado
+        service = XLSXListExportService()
+        file_buffer = service.generate_file(data, None)
+        filename = f"reportes_filtrados{service.get_file_extension()}"
+
+        return StreamingResponse(
+            io.BytesIO(file_buffer.read()),
+            media_type=service.get_content_type(),
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error al exportar reportes filtrados en XLSX: {str(e)}")
 
 @router.get("/lora/docx/{id}")
 def export_single_report_docx(id: int):

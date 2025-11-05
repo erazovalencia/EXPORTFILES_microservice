@@ -10,15 +10,15 @@ from .api.routes import router as export_router
 async def lifespan(app: FastAPI):
     """Manejo del ciclo de vida de la aplicación"""
     # Startup
-    print(" Iniciando microservicio de exportación de archivos...")
+    print(" Iniciando microservicio de creacion de reportes...")
     yield
     # Shutdown
-    print(" Cerrando microservicio de exportación de archivos...")
+    print(" Cerrando microservicio de creacion de reportes...")
 
 
 # Crear aplicación FastAPI
 app = FastAPI(
-    title="Export Files Microservice",
+    title="REPORT MICROSERVICE",
     description="Microservicio para exportar datos en diferentes formatos (PDF, DOCX, XLSX)",
     version="1.0.0",
     lifespan=lifespan
@@ -41,7 +41,7 @@ app.include_router(export_router, prefix="/api/v1", tags=["export"])
 async def root():
     """Endpoint raíz"""
     return {
-        "message": "Export Files Microservice",
+        "message": "REPORT generate microservice",
         "version": "1.0.0",
         "status": "running",
         "docs": "/docs",

@@ -1,5 +1,6 @@
 from fpdf import FPDF
 import io
+import os
 from typing import Any, Dict, List
 from datetime import datetime
 from ...base import BaseExportService
@@ -10,6 +11,7 @@ class ExportSinglePDFReportWithStyle(BaseExportService):
 
     def __init__(self):
         self.pdf = None
+        self.logo_path = None
         self.colors = {
             'background': (247, 243, 233),
             'border': (224, 207, 163),
@@ -30,6 +32,14 @@ class ExportSinglePDFReportWithStyle(BaseExportService):
             raise ValueError("Se requiere un diccionario con los datos del reporte")
 
         report_data = data
+        # Permitir pasar el logo por options o por los datos, y usar un default
+        if isinstance(options, dict):
+            self.logo_path = options.get("logo_path") or options.get("logo")
+        if not self.logo_path and isinstance(report_data, dict):
+            self.logo_path = report_data.get("logo_path") or report_data.get("logo")
+        if not self.logo_path:
+            # Ruta por defecto indicada: common/logo.png
+            self.logo_path = "common/logo.png"
         self.pdf = FPDF(orientation="P", unit="mm", format="A4")
         self.pdf.set_auto_page_break(auto=True, margin=15)
         self.pdf.add_page()
@@ -74,7 +84,12 @@ class ExportSinglePDFReportWithStyle(BaseExportService):
         code = data.get("loraReportCode", "Sin codigo")
         title = data.get("reportTitle", "Sin titulo")
         created = data.get("createdAt", datetime.now().strftime("%Y-%m-%d"))
-        self.pdf.ln(20)
+        # Dibuja el logo centrado encima del código si está disponible
+        placed_y = self._draw_logo()
+        if placed_y:
+            self.pdf.set_y(max(self.pdf.get_y(), placed_y))
+        else:
+            self.pdf.ln(20)
         self.pdf.set_font("Courier", "B", 11)
         self.pdf.set_text_color(*self.colors['text_brown'])
         self.pdf.cell(0, 8, f"CODIGO: {code}", ln=True)
@@ -194,9 +209,27 @@ class ExportSinglePDFReportWithStyle(BaseExportService):
         self.pdf.line(10, y, 200, y)
         self.pdf.ln(4)
 
+    def _draw_logo(self) -> int:
+        """Coloca un logo centrado debajo del sello y por encima del encabezado.
+        Devuelve la coordenada Y para continuar debajo del logo; 0 si no se dibuja.
+        """
+        try:
+            if not self.logo_path or not isinstance(self.logo_path, str):
+                return 0
+            # Solo dibuja si la ruta existe para evitar errores de FPDF
+            if os.path.isfile(self.logo_path):
+                logo_w = 40  # ancho del logo en mm
+                page_w = 210  # A4 portrait width
+                x = (page_w - logo_w) / 2
+                y = 30  # debajo del sello (que está en y~15)
+                self.pdf.image(self.logo_path, x=x, y=y, w=logo_w)
+                return int(y + 22)
+            return 0
+        except Exception:
+            return 0
+
     def get_content_type(self) -> str:
         return "application/pdf"
 
     def get_file_extension(self) -> str:
         return ".pdf"
-
