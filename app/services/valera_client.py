@@ -4,7 +4,7 @@ import requests
 
 
 def _get_base_url() -> str:
-    base = os.getenv("VALERA_API", "http://localhost:3000/api/")
+    base = os.getenv("VALERA_API", "http://10.0.0.45:8000/api/")
     return base.rstrip("/")
 
 
