@@ -39,5 +39,6 @@ def get_reports_by_filters(filters: Union[Mapping[str, Any], Iterable[Tuple[str,
     url = f"{_get_base_url()}/lora-report/getReportFilter"
     # Permite timeouts más generosos para consultas con múltiples filtros
     resp = requests.get(url, params=filters, timeout=60)
+    print(resp)
     resp.raise_for_status()
     return resp.json()

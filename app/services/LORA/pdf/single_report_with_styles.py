@@ -9,6 +9,33 @@ from ...base import BaseExportService
 class ExportSinglePDFReportWithStyle(BaseExportService):
     """Genera PDF de un reporte LORA con estilo visual."""
 
+    FIELDS = [
+        ("id", "ID de reporte"),
+        ("userId", "ID de usuario"),
+        ("user.documentId", "Documento de usuario"),
+        ("user.userInformation.name", "Nombre del usuario"),
+        ("user.userInformation.lastName", "Apellido del usuario"),
+        ("externalNameUser", "Nombre externo del usuario"),
+        ("externalOrganization", "Organizacion externa"),
+        ("reportTitle", "Titulo del reporte"),
+        ("conversation", "Conversacion"),
+        ("base", "Base"),
+        ("createdAt", "Fecha de creacion"),
+        ("updatedAt", "Fecha de actualizacion"),
+        ("unity", "Unidad"),
+        ("rig", "Equipo (rig)"),
+        ("project", "Proyecto"),
+        ("field", "Campo"),
+        ("reportType", "Tipo de reporte"),
+        ("hazardClassification", "Clasificacion del peligro"),
+        ("hazardType", "Tipo de peligro"),
+        ("detailedDescription", "Descripcion detallada"),
+        ("findingCause", "Causa del hallazgo"),
+        ("reportEvidence", "Evidencias del reporte"),
+        ("reportStatus", "Estado del reporte"),
+        ("loraReportCode", "Codigo de reporte LORA"),
+    ]
+
     def __init__(self):
         self.pdf = None
         self.logo_path = None
@@ -102,19 +129,11 @@ class ExportSinglePDFReportWithStyle(BaseExportService):
         self._draw_line()
 
     def _draw_summary(self, data: Dict):
-        summary_fields = [
-            ("Proyecto", data.get("project", "N/A")),
-            ("Unidad", data.get("unity", "N/A")),
-            ("Rig", data.get("rig", "N/A")),
-            ("Base", data.get("base", "N/A")),
-            ("Campo", data.get("field", "N/A")),
-            ("Clasificacion", data.get("hazardClassification", "N/A")),
-            ("Tipo de Reporte", data.get("reportType", "N/A")),
-            ("Tipo", data.get("hazardType", "N/A")),
-            ("Creado por", data.get("createdBy", "N/A")),
-            ("Actualizado", data.get("updatedAt", "N/A")),
+        field_items = [
+            (label, self._format_value(self._get_nested_value(data, key)))
+            for key, label in self.FIELDS
         ]
-        self._draw_block("Resumen", self._render_summary_grid, summary_fields)
+        self._draw_block("Detalles del reporte", self._render_summary_grid, field_items)
 
     def _draw_description(self, data: Dict):
         if data.get("detailedDescription"):
@@ -163,16 +182,37 @@ class ExportSinglePDFReportWithStyle(BaseExportService):
         self.pdf.ln(3)
 
     def _render_summary_grid(self, items: List):
+        """Renderiza pares clave/valor en dos columnas con salto de línea controlado para evitar desbordes."""
         self.pdf.set_font("Courier", "", 10)
         self.pdf.set_fill_color(*self.colors['summary_bg'])
         self.pdf.set_text_color(*self.colors['text_dark'])
-        col_width = 95
-        for i, (k, v) in enumerate(items):
-            if i % 2 == 0:
-                self.pdf.set_x(15)
-            else:
-                self.pdf.set_x(110)
-            self.pdf.cell(col_width - 5, 7, f"{k}: {v}", ln=(i % 2 != 0), fill=True)
+        col_width = 92  # ancho seguro para cada columna
+        line_height = 6
+
+        idx = 0
+        while idx < len(items):
+            y_start = self.pdf.get_y()
+
+            # Columna izquierda
+            left_label, left_val = items[idx]
+            left_text = f"{left_label}: {left_val}"
+            self.pdf.set_xy(15, y_start)
+            self.pdf.multi_cell(col_width, line_height, left_text, fill=True)
+            left_height = self.pdf.get_y() - y_start
+
+            # Columna derecha (si existe)
+            right_height = 0
+            if idx + 1 < len(items):
+                right_label, right_val = items[idx + 1]
+                right_text = f"{right_label}: {right_val}"
+                self.pdf.set_xy(110, y_start)
+                self.pdf.multi_cell(col_width, line_height, right_text, fill=True)
+                right_height = self.pdf.get_y() - y_start
+
+            row_height = max(left_height, right_height, line_height)
+            self.pdf.set_y(y_start + row_height + 2)
+            idx += 2
+
         self.pdf.ln(2)
 
     def _render_paragraph(self, text: str):
@@ -194,15 +234,49 @@ class ExportSinglePDFReportWithStyle(BaseExportService):
             self.pdf.set_fill_color(*bg)
             self.pdf.set_x(15)
             self.pdf.set_font("Courier", "B", 10)
-            self.pdf.cell(0, 8, f"Accion: {act.get('description', 'N/A')}", ln=True, fill=True)
+            self.pdf.multi_cell(0, 8, f"Accion: {act.get('description', 'N/A')}", border=0, fill=True)
             self.pdf.set_font("Courier", "", 9)
             resp = act.get("responsible", "No asignado")
             due = act.get("dueDate", "N/A")
-            self.pdf.cell(0, 6, f"Responsable: {resp}", ln=True)
-            self.pdf.cell(0, 6, f"Fecha limite: {due}", ln=True)
+            self.pdf.multi_cell(0, 6, f"Responsable: {resp}", ln=True)
+            self.pdf.multi_cell(0, 6, f"Fecha limite: {due}", ln=True)
             self.pdf.ln(3)
 
     # Utils
+    def _format_value(self, value: Any) -> Any:
+        if value is None:
+            return "N/A"
+        if isinstance(value, list):
+            formatted_items = []
+            for item in value:
+                if isinstance(item, dict):
+                    parts = [f"{k}: {v}" for k, v in item.items() if v not in (None, "")]
+                    formatted_items.append(", ".join(parts) if parts else str(item))
+                else:
+                    formatted_items.append(str(item))
+            return "\n".join(formatted_items) if formatted_items else "N/A"
+        if isinstance(value, dict):
+            parts = [f"{k}: {v}" for k, v in value.items() if v not in (None, "")]
+            return ", ".join(parts) if parts else "N/A"
+        return value
+
+    def _get_nested_value(self, obj: Dict, key: str) -> Any:
+        parts = key.split('.')
+        value = obj
+        for part in parts:
+            if isinstance(value, dict):
+                value = value.get(part, None)
+            else:
+                value = None
+            if value is None:
+                break
+        if value is None and key == "reportEvidence":
+            evidences = obj.get("evidence", [])
+            return evidences if evidences else None
+        if value is None and key == "actions":
+            return obj.get("actions", [])
+        return value
+
     def _draw_line(self):
         self.pdf.set_draw_color(*self.colors['border'])
         y = self.pdf.get_y()

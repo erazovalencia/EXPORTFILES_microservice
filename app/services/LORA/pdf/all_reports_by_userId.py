@@ -10,6 +10,34 @@ from ...valera_client import get_report_by_userId
 class ExportAllReportsByUserId(BaseExportService):
     """Genera un PDF con los reportes filtrados por userId."""
 
+    FIELDS = [
+        ("id", "ID de reporte"),
+        ("userId", "ID de usuario"),
+        ("user.documentId", "Documento de usuario"),
+        ("user.userInformation.name", "Nombre del usuario"),
+        ("user.userInformation.lastName", "Apellido del usuario"),
+        ("externalNameUser", "Nombre externo del usuario"),
+        ("externalOrganization", "Organizacion externa"),
+        ("reportTitle", "Titulo del reporte"),
+        ("conversation", "Conversacion"),
+        ("base", "Base"),
+        ("createdAt", "Fecha de creacion"),
+        ("updatedAt", "Fecha de actualizacion"),
+        ("unity", "Unidad"),
+        ("rig", "Equipo (rig)"),
+        ("project", "Proyecto"),
+        ("field", "Campo"),
+        ("reportType", "Tipo de reporte"),
+        ("hazardClassification", "Clasificacion del peligro"),
+        ("hazardType", "Tipo de peligro"),
+        ("detailedDescription", "Descripcion detallada"),
+        ("findingCause", "Causa del hallazgo"),
+        ("reportEvidence", "Evidencias del reporte"),
+        ("actions", "Acciones"),
+        ("reportStatus", "Estado del reporte"),
+        ("loraReportCode", "Codigo de reporte LORA"),
+    ]
+
     def __init__(self, user_id: int):
         self.user_id = user_id
         self.pdf = FPDF(orientation="P", unit="mm", format="A4")
@@ -52,15 +80,7 @@ class ExportAllReportsByUserId(BaseExportService):
         self.pdf.set_text_color(0, 0, 0)
 
         self._render_header(data)
-        self._render_section("Resumen", self._extract_summary(data))
-        self._render_section("Descripcion", data.get("detailedDescription", "N/A"))
-        self._render_section("Causa", data.get("findingCause", "N/A"))
-        self._render_section("Conversacion", data.get("conversation", "N/A"))
-        evidences = data.get("evidence")
-        if evidences is None:
-            rep_evid = data.get("reportEvidence")
-            evidences = [rep_evid] if rep_evid else []
-        self._render_section("Evidencias", "\n".join(evidences if isinstance(evidences, list) else [str(evidences)]))
+        self._render_section("Detalles del reporte", self._format_fields(data))
         self._render_section("Acciones", self._format_actions(data.get("actions", [])))
         self._render_footer(data)
 
@@ -95,20 +115,16 @@ class ExportAllReportsByUserId(BaseExportService):
         self.pdf.cell(0, 0, "-" * 120, ln=True)
         self.pdf.ln(3)
 
-    def _extract_summary(self, data: Dict) -> str:
-        fields = [
-            ("Proyecto", "project"),
-            ("Unidad", "unity"),
-            ("Rig", "rig"),
-            ("Base", "base"),
-            ("Campo", "field"),
-            ("Clasificacion", "hazardClassification"),
-            ("Tipo de Reporte", "reportType"),
-            ("Tipo", "hazardType"),
-            ("Creado por", "createdBy"),
-            ("Actualizado", "updatedAt"),
-        ]
-        return "\n".join([f"{label}: {data.get(key, 'N/A')}" for label, key in fields])
+    def _format_fields(self, data: Dict) -> str:
+        lines = []
+        for key, label in self.FIELDS:
+            if key == "actions":
+                value = self._format_actions(data.get("actions", []))
+            else:
+                value = self._format_value(self._get_nested_value(data, key))
+            cleaned = value if value not in (None, "") else "N/A"
+            lines.append(f"{label}: {cleaned}")
+        return "\n\n".join(lines)
 
     def _format_actions(self, actions: List[Dict]) -> str:
         if not actions:
@@ -121,6 +137,40 @@ class ExportAllReportsByUserId(BaseExportService):
             status = act.get("status", "N/A").upper()
             result.append(f"{i}. {desc}\n   Responsable: {resp}\n   Fecha limite: {due}\n   Estado: {status}\n")
         return "\n".join(result)
+
+    def _format_value(self, value: Any) -> Any:
+        if value is None:
+            return "N/A"
+        if isinstance(value, list):
+            formatted_items = []
+            for item in value:
+                if isinstance(item, dict):
+                    parts = [f"{k}: {v}" for k, v in item.items() if v not in (None, "")]
+                    formatted_items.append(", ".join(parts) if parts else str(item))
+                else:
+                    formatted_items.append(str(item))
+            return "\n".join(formatted_items) if formatted_items else "N/A"
+        if isinstance(value, dict):
+            parts = [f"{k}: {v}" for k, v in value.items() if v not in (None, "")]
+            return ", ".join(parts) if parts else "N/A"
+        return value
+
+    def _get_nested_value(self, obj: Dict, key: str) -> Any:
+        parts = key.split('.')
+        value = obj
+        for part in parts:
+            if isinstance(value, dict):
+                value = value.get(part, None)
+            else:
+                value = None
+            if value is None:
+                break
+        if value is None and key == "reportEvidence":
+            evidences = obj.get("evidence", [])
+            return evidences if evidences else None
+        if value is None and key == "actions":
+            return obj.get("actions", [])
+        return value
 
     def get_content_type(self) -> str:
         return "application/pdf"

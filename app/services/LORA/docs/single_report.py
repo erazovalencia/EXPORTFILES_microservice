@@ -10,6 +10,33 @@ from ...base import BaseExportService
 class DOCXExportService(BaseExportService):
     """Servicio para generar reportes DOCX con formato institucional y sobrio"""
 
+    FIELDS = [
+        ("id", "ID de reporte"),
+        ("userId", "ID de usuario"),
+        ("user.documentId", "Documento de usuario"),
+        ("user.userInformation.name", "Nombre del usuario"),
+        ("user.userInformation.lastName", "Apellido del usuario"),
+        ("externalNameUser", "Nombre externo del usuario"),
+        ("externalOrganization", "Organizacion externa"),
+        ("reportTitle", "Titulo del reporte"),
+        ("conversation", "Conversacion"),
+        ("base", "Base"),
+        ("createdAt", "Fecha de creacion"),
+        ("updatedAt", "Fecha de actualizacion"),
+        ("unity", "Unidad"),
+        ("rig", "Equipo (rig)"),
+        ("project", "Proyecto"),
+        ("field", "Campo"),
+        ("reportType", "Tipo de reporte"),
+        ("hazardClassification", "Clasificacion del peligro"),
+        ("hazardType", "Tipo de peligro"),
+        ("detailedDescription", "Descripcion detallada"),
+        ("findingCause", "Causa del hallazgo"),
+        ("reportEvidence", "Evidencias del reporte"),
+        ("actions", "Acciones"),
+        ("reportStatus", "Estado del reporte"),
+        ("loraReportCode", "Codigo de reporte LORA"),
+    ]
     def __init__(self):
         self.document = None
 
@@ -22,11 +49,7 @@ class DOCXExportService(BaseExportService):
 
         # Secciones principales del documento
         self._render_header(data)
-        self._render_summary(data)
-        self._render_section("Descripción", data.get("detailedDescription"))
-        self._render_section("Causa", data.get("findingCause"))
-        self._render_section("Conversación", data.get("conversation"))
-        self._render_evidences(data.get("evidence", []))
+        self._render_fields_table(data)
         self._render_actions(data.get("actions", []))
         self._render_footer(data)
 
@@ -65,22 +88,9 @@ class DOCXExportService(BaseExportService):
 
         self._add_separator()
 
-    def _render_summary(self, data: Dict):
-        """Bloque resumen (proyecto, unidad, base, etc.)"""
-        self.document.add_heading("Resumen", level=1)
-
-        summary_fields = [
-            ("Proyecto", data.get("project", "N/A")),
-            ("Unidad", data.get("unity", "N/A")),
-            ("Rig", data.get("rig", "N/A")),
-            ("Base", data.get("base", "N/A")),
-            ("Campo", data.get("field", "N/A")),
-            ("Clasificación", data.get("hazardClassification", "N/A")),
-            ("Tipo de Reporte", data.get("reportType", "N/A")),
-            ("Tipo", data.get("hazardType", "N/A")),
-            ("Creado por", data.get("createdBy", "N/A")),
-            ("Actualizado", data.get("updatedAt", "N/A")),
-        ]
+    def _render_fields_table(self, data: Dict):
+        """Tabla con todos los campos alineados a XLSX all_reports"""
+        self.document.add_heading("Detalles del reporte", level=1)
 
         table = self.document.add_table(rows=1, cols=2)
         table.style = "Table Grid"
@@ -88,30 +98,15 @@ class DOCXExportService(BaseExportService):
         hdr_cells[0].text = "Campo"
         hdr_cells[1].text = "Valor"
 
-        for label, value in summary_fields:
+        for key, label in self.FIELDS:
+            if key == "actions":
+                value = self._format_actions(data.get("actions", []))
+            else:
+                value = self._format_value(self._get_nested_value(data, key, fallback=data))
             row = table.add_row().cells
             row[0].text = str(label)
-            row[1].text = str(value)
+            row[1].text = str(value if value not in (None, "") else "N/A")
 
-        self._add_separator()
-
-    def _render_section(self, title: str, content: str):
-        """Sección textual genérica"""
-        if not content:
-            return
-        self.document.add_heading(title, level=1)
-        p = self.document.add_paragraph(content)
-        p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-        self._add_separator()
-
-    def _render_evidences(self, evidences: List):
-        """Sección de evidencias"""
-        self.document.add_heading("Evidencias", level=1)
-        if evidences:
-            for e in evidences:
-                self.document.add_paragraph(f"- {e}", style="List Bullet")
-        else:
-            self.document.add_paragraph("Sin evidencias adjuntas.")
         self._add_separator()
 
     def _render_actions(self, actions: List[Dict]):
@@ -149,6 +144,42 @@ class DOCXExportService(BaseExportService):
     # ---------------------------
     # UTILITARIOS / ESTILO
     # ---------------------------
+
+    def _get_nested_value(self, obj: Dict, key: str, fallback: Dict = None) -> Any:
+        """Navega claves anidadas usando punto. Permite fallback para casos especiales."""
+        parts = key.split('.')
+        value = obj
+        for part in parts:
+            if isinstance(value, dict):
+                value = value.get(part, None)
+            else:
+                value = None
+            if value is None:
+                break
+        if value is None and fallback and key == "reportEvidence":
+            evidences = fallback.get("evidence", [])
+            return evidences if evidences else None
+        if value is None and fallback and key == "actions":
+            return fallback.get("actions", [])
+        return value
+
+    def _format_value(self, value: Any) -> Any:
+        """Normaliza listas/diccionarios a texto legible."""
+        if value is None:
+            return "N/A"
+        if isinstance(value, list):
+            formatted_items = []
+            for item in value:
+                if isinstance(item, dict):
+                    parts = [f"{k}: {v}" for k, v in item.items() if v not in (None, "")]
+                    formatted_items.append(", ".join(parts) if parts else str(item))
+                else:
+                    formatted_items.append(str(item))
+            return "\n".join(formatted_items) if formatted_items else "N/A"
+        if isinstance(value, dict):
+            parts = [f"{k}: {v}" for k, v in value.items() if v not in (None, "")]
+            return ", ".join(parts) if parts else "N/A"
+        return value
 
     def _apply_base_styles(self):
         """Estilos base para texto institucional"""

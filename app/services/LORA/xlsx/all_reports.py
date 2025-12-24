@@ -35,16 +35,35 @@ class XLSXListExportService(BaseExportService):
 
         # Encabezados conforme al modelo completo
         headers = [
-            "id", "userId", "reportTitle",
-            "conversation", "base", "createdAt", "updatedAt", "unity", "rig", "project", "field",
-            "reportType", "hazardClassification", "hazardType", "detailedDescription", "findingCause",
-            "reportEvidence", "reportStatus", "closureActions", "externalName", "externalOrganization",
-            "loraReportCode"
+            ("id", "ID de reporte"),
+            ("user.documentId", "Documento de usuario"),
+            ("user.userInformation.name", "Nombre del usuario"),
+            ("user.userInformation.lastName", "Apellido del usuario"),
+            ("externalNameUser", "Nombre externo del usuario"),
+            ("externalOrganization", "Organizacion externa"),
+            ("reportTitle", "Titulo del reporte"),
+            ("conversation", "Conversacion"),
+            ("base", "Base"),
+            ("createdAt", "Fecha de creacion"),
+            ("updatedAt", "Fecha de actualizacion"),
+            ("unity", "Unidad"),
+            ("rig", "Equipo (rig)"),
+            ("project", "Proyecto"),
+            ("field", "Campo"),
+            ("reportType", "Tipo de reporte"),
+            ("hazardClassification", "Clasificacion del peligro"),
+            ("hazardType", "Tipo de peligro"),
+            ("detailedDescription", "Descripcion detallada"),
+            ("findingCause", "Causa del hallazgo"),
+            ("reportEvidence", "Evidencias del reporte"),
+            ("actions", "Acciones"),
+            ("reportStatus", "Estado del reporte"),
+            ("loraReportCode", "Codigo de reporte LORA"),
         ]
 
         # Escribir encabezado
-        for col_index, header in enumerate(headers, start=1):
-            cell = sheet.cell(row=1, column=col_index, value=header)
+        for col_index, (_, header_label) in enumerate(headers, start=1):
+            cell = sheet.cell(row=1, column=col_index, value=header_label)
             cell.font = Font(bold=True)
             cell.fill = PatternFill(start_color=self.colors["header_fill"], fill_type="solid")
             cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -54,9 +73,9 @@ class XLSXListExportService(BaseExportService):
         # Escribir filas
         for row_index, report in enumerate(data, start=2):
             fill_color = self.colors["row_even_fill"] if row_index % 2 == 0 else self.colors["row_odd_fill"]
-            for col_index, header in enumerate(headers, start=1):
+            for col_index, (header_key, _) in enumerate(headers, start=1):
                 # permitir navegación en campos anidados (e.g., user.externalName)
-                value = self._get_nested_value(report, header)
+                value = self._format_value(self._get_nested_value(report, header_key))
                 cell = sheet.cell(row=row_index, column=col_index, value=value)
                 cell.fill = PatternFill(start_color=fill_color, fill_type="solid")
                 cell.alignment = Alignment(vertical="top", wrap_text=True)
@@ -96,6 +115,23 @@ class XLSXListExportService(BaseExportService):
                 value = None
             if value is None:
                 return ""
+        return value
+
+    def _format_value(self, value: Any) -> Any:
+        """
+        Normaliza valores complejos (listas/diccionarios) para que se vean legibles en la celda.
+        """
+        if isinstance(value, list):
+            formatted_items = []
+            for item in value:
+                if isinstance(item, dict):
+                    parts = [f"{k}: {v}" for k, v in item.items() if v not in (None, "")]
+                    formatted_items.append(", ".join(parts) if parts else str(item))
+                else:
+                    formatted_items.append(str(item))
+            return "\n".join(formatted_items)
+        if isinstance(value, dict):
+            return ", ".join([f"{k}: {v}" for k, v in value.items() if v not in (None, "")])
         return value
 
     def get_content_type(self) -> str:

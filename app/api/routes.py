@@ -77,6 +77,7 @@ async def export_pdf_all_reports_by_user(userId: int):
 @router.get("/lora/xlsx_all_reports", summary="Exporta todos los reportes en XLSX (listado)")
 def export_xlsx_all_reports():
     data = get_reports()
+    print(data)
     service = XLSXListExportService()
     file_buffer = service.generate_file(data, None)
     filename = f"todos_los_reportes{service.get_file_extension()}"
@@ -89,6 +90,7 @@ def export_xlsx_all_reports():
 @router.get("/lora/xlsx_all_reports_by_user/{userId}", summary="Exporta reportes por usuario en XLSX (listado)")
 def export_xlsx_all_reports_by_user(userId: int):
     resp = get_report_by_userId(userId)
+    print(resp)
     data = (((resp or {}).get("data") or {}).get("data") or [])
     service = XLSXListExportService()
     file_buffer = service.generate_file(data, None)

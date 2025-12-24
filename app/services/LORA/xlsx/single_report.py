@@ -9,6 +9,34 @@ from ...base import BaseExportService
 class XLSXExportService(BaseExportService):
     """Servicio para generar reportes XLSX con formato empresarial estructurado"""
 
+    FIELDS = [
+        ("id", "ID de reporte"),
+        ("userId", "ID de usuario"),
+        ("user.documentId", "Documento de usuario"),
+        ("user.userInformation.name", "Nombre del usuario"),
+        ("user.userInformation.lastName", "Apellido del usuario"),
+        ("externalNameUser", "Nombre externo del usuario"),
+        ("externalOrganization", "Organizacion externa"),
+        ("reportTitle", "Titulo del reporte"),
+        ("conversation", "Conversacion"),
+        ("base", "Base"),
+        ("createdAt", "Fecha de creacion"),
+        ("updatedAt", "Fecha de actualizacion"),
+        ("unity", "Unidad"),
+        ("rig", "Equipo (rig)"),
+        ("project", "Proyecto"),
+        ("field", "Campo"),
+        ("reportType", "Tipo de reporte"),
+        ("hazardClassification", "Clasificacion del peligro"),
+        ("hazardType", "Tipo de peligro"),
+        ("detailedDescription", "Descripcion detallada"),
+        ("findingCause", "Causa del hallazgo"),
+        ("reportEvidence", "Evidencias del reporte"),
+        ("actions", "Acciones"),
+        ("reportStatus", "Estado del reporte"),
+        ("loraReportCode", "Codigo de reporte LORA"),
+    ]
+
     def __init__(self):
         self.workbook = None
         # Colores y estilos
@@ -62,20 +90,8 @@ class XLSXExportService(BaseExportService):
 
         # Campos clave
         summary_fields = [
-            ("Identificador", data.get("id", "N/A")),
-            ("Código", data.get("loraReportCode", "N/A")),
-            ("Estado", data.get("reportStatus", "N/A").upper()),
-            ("Proyecto", data.get("project", "N/A")),
-            ("Unidad", data.get("unity", "N/A")),
-            ("Rig", data.get("rig", "N/A")),
-            ("Base", data.get("base", "N/A")),
-            ("Campo", data.get("field", "N/A")),
-            ("Clasificación", data.get("hazardClassification", "N/A")),
-            ("Tipo de Reporte", data.get("reportType", "N/A")),
-            ("Tipo", data.get("hazardType", "N/A")),
-            ("Creado por", data.get("createdBy", "N/A")),
-            ("Creado en", data.get("createdAt", "N/A")),
-            ("Actualizado", data.get("updatedAt", "N/A")),
+            (label, self._format_value(self._get_nested_value(data, key, fallback=data)))
+            for key, label in self.FIELDS
         ]
 
         start_row = 3
@@ -178,6 +194,43 @@ class XLSXExportService(BaseExportService):
         ws["A1"] = str(data)
         ws["A1"].font = Font(bold=True)
         ws.column_dimensions["A"].width = 50
+
+    # ---------------------------
+    # HELPERS
+    # ---------------------------
+    def _get_nested_value(self, obj: Dict, key: str, fallback: Dict = None) -> Any:
+        parts = key.split('.')
+        value = obj
+        for part in parts:
+            if isinstance(value, dict):
+                value = value.get(part, None)
+            else:
+                value = None
+            if value is None:
+                break
+        if value is None and fallback and key == "reportEvidence":
+            evidences = fallback.get("evidence", [])
+            return evidences if evidences else None
+        if value is None and fallback and key == "actions":
+            return fallback.get("actions", [])
+        return value
+
+    def _format_value(self, value: Any) -> Any:
+        if value is None:
+            return "N/A"
+        if isinstance(value, list):
+            formatted_items = []
+            for item in value:
+                if isinstance(item, dict):
+                    parts = [f"{k}: {v}" for k, v in item.items() if v not in (None, "")]
+                    formatted_items.append(", ".join(parts) if parts else str(item))
+                else:
+                    formatted_items.append(str(item))
+            return "\n".join(formatted_items) if formatted_items else "N/A"
+        if isinstance(value, dict):
+            parts = [f"{k}: {v}" for k, v in value.items() if v not in (None, "")]
+            return ", ".join(parts) if parts else "N/A"
+        return value
 
     # ---------------------------
     # METADATOS
